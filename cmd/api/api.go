@@ -67,6 +67,11 @@ func (app *application) mount() http.Handler {
 			})
 
 		})
+
+		//Public routes
+		r.Route("/authentication", func(r chi.Router) {
+			r.Post("/user", app.registerUserHandler)
+		})
 	})
 	return r
 }

@@ -12,6 +12,18 @@ type RegisterUserPayload struct {
 	Password string `json:"password" validate:"required,min=3,max=72"`
 }
 
+// RegisterUser godoc
+//
+//	@Summary		Register user
+//	@Description	Register a new user account
+//	@Tags			authentication
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body	RegisterUserPayload	true	"User registration payload"
+//	@Success		201
+//	@Failure		400	{object}	error
+//	@Failure		500	{object}	error
+//	@Router			/authentication/user [post]
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
 	var payload RegisterUserPayload
 	if err := readJSON(w, r, payload); err != nil {
@@ -35,10 +47,12 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Store the user
-	if err := app.store.Users.Create(r.Context(), user); err != nil {
+	if err := app.store.Users.CreateAndInvite(r.Context(), user, "uuidv4"); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
+
+	// Send email
 
 	if err := app.jsonResponse(w, http.StatusCreated, nil); err != nil {
 		app.internalServerError(w, r, err)

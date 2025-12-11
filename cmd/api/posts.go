@@ -20,6 +20,18 @@ type CreatePostPayload struct {
 	Tags    []string `json:"tags"`
 }
 
+// CreatePost godoc
+//
+//	@Summary		Create post
+//	@Description	Create a new post
+//	@Tags			posts
+//	@Accept			json
+//	@Produce		json
+//	@Param			payload	body		CreatePostPayload	true	"Post payload"
+//	@Success		201		{object}	store.Post
+//	@Failure		400		{object}	error
+//	@Failure		500		{object}	error
+//	@Router			/posts [post]
 func (app *application) createPostHandler(w http.ResponseWriter, r *http.Request) {
 	var payload CreatePostPayload
 	if err := readJSON(w, r, &payload); err != nil {
@@ -52,6 +64,19 @@ func (app *application) createPostHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// GetPost godoc
+//
+//	@Summary		Get post
+//	@Description	Get a post by ID with its comments
+//	@Tags			posts
+//	@Accept			json
+//	@Produce		json
+//	@Param			postID	path		int64	true	"Post ID"
+//	@Success		200		{object}	store.Post
+//	@Failure		400		{object}	error
+//	@Failure		404		{object}	error
+//	@Failure		500		{object}	error
+//	@Router			/posts/{postID} [get]
 func (app *application) getPostHandler(w http.ResponseWriter, r *http.Request) {
 	post := getPostFromCtx(r)
 	comments, err := app.store.Comments.GetByPostID(r.Context(), post.ID)
@@ -68,6 +93,18 @@ func (app *application) getPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeletePost godoc
+//
+//	@Summary		Delete post
+//	@Description	Delete a post by ID
+//	@Tags			posts
+//	@Accept			json
+//	@Produce		json
+//	@Param			postID	path	int64	true	"Post ID"
+//	@Success		204
+//	@Failure		404	{object}	error
+//	@Failure		500	{object}	error
+//	@Router			/posts/{postID} [delete]
 func (app *application) deletePostHandler(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "postID")
 	id, err := strconv.ParseInt(idParam, 10, 64)
@@ -98,6 +135,20 @@ type UpdatePostPayload struct {
 	Content *string `validate:"omitempty,max=1000"`
 }
 
+// UpdatePost godoc
+//
+//	@Summary		Update post
+//	@Description	Update a post by ID (partial update)
+//	@Tags			posts
+//	@Accept			json
+//	@Produce		json
+//	@Param			postID	path		int64				true	"Post ID"
+//	@Param			payload	body		UpdatePostPayload	true	"Post update payload"
+//	@Success		200		{object}	store.Post
+//	@Failure		400		{object}	error
+//	@Failure		404		{object}	error
+//	@Failure		500		{object}	error
+//	@Router			/posts/{postID} [patch]
 func (app *application) updatePostHandler(w http.ResponseWriter, r *http.Request) {
 	post := getPostFromCtx(r)
 

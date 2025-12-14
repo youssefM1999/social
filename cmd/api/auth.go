@@ -102,7 +102,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Send email
-	err := app.mailer.Send(
+	statusCode, err := app.mailer.Send(
 		mailer.UserInvitationTemplateFile,
 		user.Username,
 		user.Email,
@@ -110,7 +110,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		!isProdEnv,
 	)
 	if err != nil {
-		app.logger.Errorw("failed to send welcome email", "error", err)
+		app.logger.Errorw("failed to send welcome email", "error", err, "statusCode", statusCode)
 
 		// rollback user creation if email fails (SAGA pattern)
 		if err := app.store.Users.Delete(ctx, user.ID); err != nil {
@@ -121,6 +121,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		app.internalServerError(w, r, err)
 		return
 	}
+	app.logger.Infow("email sent successfully", "statusCode", statusCode, "to", user.Email)
 
 	if err := app.jsonResponse(w, http.StatusCreated, userWithToken); err != nil {
 		app.internalServerError(w, r, err)

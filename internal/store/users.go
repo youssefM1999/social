@@ -39,7 +39,7 @@ type UserStore struct {
 	db *sql.DB
 }
 
-func (u *UserStore) Create(ctx context.Context, user *User) error {
+func (u *UserStore) Create(ctx context.Context, tx *sql.Tx, user *User) error {
 	query := `
 	INSERT INTO users (username, password, email)
 	VALUES ($1, $2, $3) RETURNING id, created_at
@@ -47,18 +47,25 @@ func (u *UserStore) Create(ctx context.Context, user *User) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryContextTimeout)
 	defer cancel()
 
-	err := u.db.QueryRowContext(
+	err := tx.QueryRowContext(
 		ctx,
 		query,
 		user.Username,
-		user.Password,
+		user.Password.hash,
 		user.Email,
 	).Scan(
 		&user.ID,
 		&user.CreatedAt,
 	)
 	if err != nil {
-		return err
+		switch {
+		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key"`:
+			return ErrDuplicateEmail
+		case err.Error() == `pq: duplicate key value violates unique constraint "users_username_key"`:
+			return ErrDuplicateUsername
+		default:
+			return err
+		}
 	}
 	return nil
 }
@@ -77,7 +84,7 @@ func (u *UserStore) GetByID(ctx context.Context, id int64) (*User, error) {
 		&user.ID,
 		&user.Username,
 		&user.Email,
-		&user.Password,
+		&user.Password.hash,
 		&user.CreatedAt,
 	)
 	if err != nil {
@@ -91,13 +98,85 @@ func (u *UserStore) GetByID(ctx context.Context, id int64) (*User, error) {
 	return &user, nil
 }
 
-func (u *UserStore) CreateAndInvite(ctx context.Context, user *User, token string) error {
+func (u *UserStore) CreateAndInvite(ctx context.Context, user *User, token string, invitationExpiry time.Duration) error {
 	// transaction wrapper
 	// create the user
 	// create the user invite
 	return withTx(u.db, ctx, func(tx *sql.Tx) error {
-		// TODO: Implement the transaction logic once done with documentation
-		return nil
+		if err := u.Create(ctx, tx, user); err != nil {
+			return err
+		}
 
+		if err := u.createUserInvitation(ctx, tx, user.ID, token, invitationExpiry); err != nil {
+			return err
+		}
+
+		return nil
 	})
+}
+
+func (u *UserStore) createUserInvitation(ctx context.Context, tx *sql.Tx, userID int64, token string, exp time.Duration) error {
+	query := `
+	INSERT INTO user_invitations (user_id, token, expiry)
+	VALUES ($1, $2, $3)
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, QueryContextTimeout)
+	defer cancel()
+
+	_, err := tx.ExecContext(
+		ctx,
+		query,
+		userID,
+		token,
+		time.Now().Add(exp),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *UserStore) Delete(ctx context.Context, userID int64) error {
+	return withTx(u.db, ctx, func(tx *sql.Tx) error {
+		if err := u.delete(ctx, tx, userID); err != nil {
+			return err
+		}
+
+		if err := u.deleteUserInvitation(ctx, tx, userID); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (u *UserStore) delete(ctx context.Context, tx *sql.Tx, userID int64) error {
+	query := `
+	DELETE FROM users
+	WHERE id = $1
+	`
+	ctx, cancel := context.WithTimeout(ctx, QueryContextTimeout)
+	defer cancel()
+
+	_, err := tx.ExecContext(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *UserStore) deleteUserInvitation(ctx context.Context, tx *sql.Tx, userID int64) error {
+	query := `
+	DELETE FROM user_invitations
+	WHERE user_id = $1
+	`
+	ctx, cancel := context.WithTimeout(ctx, QueryContextTimeout)
+	defer cancel()
+
+	_, err := tx.ExecContext(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+	return nil
 }

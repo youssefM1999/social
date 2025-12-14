@@ -143,6 +143,29 @@ func (app *application) userContextMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Request) {
+	token := chi.URLParam(r, "token")
+	app.logger.Infow("activating user", "token", token)
+	err := app.store.Users.Activate(r.Context(), token)
+	if err != nil {
+		switch err {
+		case store.ErrNotFound:
+			app.logger.Errorw("user not found", "error", err)
+			app.notFoundResponse(w, r, err)
+		default:
+			app.logger.Errorw("failed to activate user", "error", err)
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	app.logger.Infow("user activated successfully", "token", token)
+
+	if err := app.jsonResponse(w, http.StatusNoContent, nil); err != nil {
+		app.internalServerError(w, r, err)
+	}
+}
+
 func getUserFromCtx(r *http.Request) *store.User {
 	user, _ := r.Context().Value(userCtx).(*store.User)
 	return user

@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/youssefM1999/social/internal/auth"
 	"github.com/youssefM1999/social/internal/db"
 	"github.com/youssefM1999/social/internal/env"
 	"github.com/youssefM1999/social/internal/mailer"
@@ -48,6 +49,17 @@ func main() {
 				apiKey: env.GetString("SENDGRID_API_KEY", ""),
 			},
 		},
+		auth: authConfig{
+			basic: basicAuthConfig{
+				user: env.GetString("BASIC_AUTH_USER", "admin"),
+				pass: env.GetString("BASIC_AUTH_PASS", "admin"),
+			},
+			token: tokenAuthConfig{
+				secret: env.GetString("TOKEN_AUTH_SECRET", ""),
+				iss:    env.GetString("TOKEN_AUTH_ISS", ""),
+				exp:    env.GetDuration("TOKEN_AUTH_EXP", time.Hour*24*3),
+			},
+		},
 	}
 
 	// Logger
@@ -71,11 +83,15 @@ func main() {
 
 	mailer := mailer.NewSendgrid(cfg.mail.sendGrid.apiKey, cfg.mail.fromEmail)
 
+	tokenHost := "gophersocial"
+	jwtAuthenticator := auth.NewJWTAuthenticator(cfg.auth.token.secret, tokenHost, tokenHost)
+
 	app := application{
-		config: cfg,
-		store:  store,
-		logger: logger,
-		mailer: mailer,
+		config:        cfg,
+		store:         store,
+		logger:        logger,
+		mailer:        mailer,
+		authenticator: jwtAuthenticator,
 	}
 	mux := app.mount()
 	logger.Fatal(app.run(mux))

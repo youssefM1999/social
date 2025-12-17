@@ -13,15 +13,17 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/youssefM1999/social/docs" // this is required to generate swagger docs
+	"github.com/youssefM1999/social/internal/auth"
 	"github.com/youssefM1999/social/internal/mailer"
 	"github.com/youssefM1999/social/internal/store"
 )
 
 type application struct {
-	config config
-	store  store.Storage
-	logger *zap.SugaredLogger
-	mailer mailer.Client
+	config        config
+	store         store.Storage
+	logger        *zap.SugaredLogger
+	mailer        mailer.Client
+	authenticator auth.Authenticator
 }
 
 type config struct {
@@ -31,6 +33,7 @@ type config struct {
 	env         string
 	mail        mailConfig
 	frontendURL string
+	auth        authConfig
 }
 
 type dbConfig struct {
@@ -50,6 +53,21 @@ type sendGridConfig struct {
 	apiKey string
 }
 
+type authConfig struct {
+	basic basicAuthConfig
+	token tokenAuthConfig
+}
+
+type basicAuthConfig struct {
+	user string
+	pass string
+}
+type tokenAuthConfig struct {
+	secret string
+	iss    string
+	exp    time.Duration
+}
+
 func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
 
@@ -67,12 +85,13 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.URLFormat)
 	r.Route("/v1", func(r chi.Router) {
-		r.Get("/health", app.healthCheckHandler)
+		r.With(app.BasicAuthMiddleware()).Get("/health", app.healthCheckHandler)
 
 		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
 		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))
 
 		r.Route("/posts", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
 			r.Post("/", app.createPostHandler)
 
 			r.Route("/{postID}", func(r chi.Router) {
@@ -91,7 +110,7 @@ func (app *application) mount() http.Handler {
 			r.Put("/activate/{token}", app.activateUserHandler)
 
 			r.Route("/{userID}", func(r chi.Router) {
-				r.Use(app.userContextMiddleware)
+				r.Use(app.AuthTokenMiddleware)
 				r.Get("/", app.getUserHandler)
 
 				r.Put("/follow", app.followUserHandler)
@@ -108,6 +127,7 @@ func (app *application) mount() http.Handler {
 		//Public routes
 		r.Route("/authentication", func(r chi.Router) {
 			r.Post("/user", app.registerUserHandler)
+			r.Post("/token", app.createTokenHandler)
 		})
 	})
 	return r

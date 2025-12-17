@@ -37,6 +37,10 @@ func (p *password) Set(text string) error {
 	return nil
 }
 
+func (p *password) Check(text string) error {
+	return bcrypt.CompareHashAndPassword(p.hash, []byte(text))
+}
+
 type UserStore struct {
 	db *sql.DB
 }
@@ -83,6 +87,38 @@ func (u *UserStore) GetByID(ctx context.Context, id int64) (*User, error) {
 
 	var user User
 	err := u.db.QueryRowContext(ctx, query, id).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.Password.hash,
+		&user.CreatedAt,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrNotFound
+		default:
+			return nil, err
+		}
+	}
+	return &user, nil
+}
+
+func (u *UserStore) GetByEmail(ctx context.Context, email string) (*User, error) {
+	query := `
+	SELECT id, username, email, password, created_at 
+	FROM users 
+	WHERE email = $1 AND is_active = true
+	`
+	ctx, cancel := context.WithTimeout(ctx, QueryContextTimeout)
+	defer cancel()
+
+	var user User
+	err := u.db.QueryRowContext(
+		ctx,
+		query,
+		email,
+	).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,

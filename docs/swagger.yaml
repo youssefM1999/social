@@ -24,10 +24,18 @@ definitions:
     - content
     - title
     type: object
-  main.FollowUserPayload:
+  main.CreateUserTokenPayload:
     properties:
-      user_id:
-        type: integer
+      email:
+        maxLength: 255
+        type: string
+      password:
+        maxLength: 72
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
     type: object
   main.RegisterUserPayload:
     properties:
@@ -122,6 +130,34 @@ info:
   termsOfService: http://swagger.io/terms/
   title: GopherSocial API
 paths:
+  /authentication/token:
+    post:
+      consumes:
+      - application/json
+      description: Create a new token for a user
+      parameters:
+      - description: User token creation payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateUserTokenPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema: {}
+        "500":
+          description: Internal Server Error
+          schema: {}
+      summary: Create token
+      tags:
+      - authentication
   /authentication/user:
     post:
       consumes:
@@ -363,12 +399,6 @@ paths:
         name: userID
         required: true
         type: integer
-      - description: Follow payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/main.FollowUserPayload'
       produces:
       - application/json
       responses:
@@ -401,12 +431,6 @@ paths:
         name: userID
         required: true
         type: integer
-      - description: Unfollow payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/main.FollowUserPayload'
       produces:
       - application/json
       responses:

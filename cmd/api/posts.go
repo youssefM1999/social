@@ -31,6 +31,7 @@ type CreatePostPayload struct {
 //	@Success		201		{object}	store.Post
 //	@Failure		400		{object}	error
 //	@Failure		500		{object}	error
+//	@Security		ApiKeyAuth
 //	@Router			/posts [post]
 func (app *application) createPostHandler(w http.ResponseWriter, r *http.Request) {
 	var payload CreatePostPayload
@@ -105,6 +106,7 @@ func (app *application) getPostHandler(w http.ResponseWriter, r *http.Request) {
 //	@Success		204
 //	@Failure		404	{object}	error
 //	@Failure		500	{object}	error
+//	@Security		ApiKeyAuth
 //	@Router			/posts/{postID} [delete]
 func (app *application) deletePostHandler(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "postID")
@@ -149,6 +151,7 @@ type UpdatePostPayload struct {
 //	@Failure		400		{object}	error
 //	@Failure		404		{object}	error
 //	@Failure		500		{object}	error
+//	@Security		ApiKeyAuth
 //	@Router			/posts/{postID} [patch]
 func (app *application) updatePostHandler(w http.ResponseWriter, r *http.Request) {
 	post := getPostFromCtx(r)

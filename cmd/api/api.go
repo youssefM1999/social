@@ -16,6 +16,7 @@ import (
 	"github.com/youssefM1999/social/internal/auth"
 	"github.com/youssefM1999/social/internal/mailer"
 	"github.com/youssefM1999/social/internal/store"
+	"github.com/youssefM1999/social/internal/store/cache"
 )
 
 type application struct {
@@ -24,6 +25,7 @@ type application struct {
 	logger        *zap.SugaredLogger
 	mailer        mailer.Client
 	authenticator auth.Authenticator
+	cacheStorage  cache.Storage
 }
 
 type config struct {
@@ -34,6 +36,7 @@ type config struct {
 	mail        mailConfig
 	frontendURL string
 	auth        authConfig
+	redisCfg    redisConfig
 }
 
 type dbConfig struct {
@@ -68,6 +71,13 @@ type tokenAuthConfig struct {
 	exp    time.Duration
 }
 
+type redisConfig struct {
+	addr    string
+	pwd     string
+	db      int
+	enabled bool
+}
+
 func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
 
@@ -98,8 +108,8 @@ func (app *application) mount() http.Handler {
 				r.Use(app.postsContextMiddleware)
 				r.Get("/", app.getPostHandler)
 
-				r.Delete("/", app.deletePostHandler)
-				r.Patch("/", app.updatePostHandler)
+				r.Patch("/", app.CheckPostOwnershipMiddleware("moderator", app.updatePostHandler))
+				r.Delete("/", app.CheckPostOwnershipMiddleware("admin", app.deletePostHandler))
 
 				r.Route("/comments", func(r chi.Router) {
 					r.Post("/", app.createCommentHandler)

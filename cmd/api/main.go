@@ -3,11 +3,13 @@ package main
 import (
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/youssefM1999/social/internal/auth"
 	"github.com/youssefM1999/social/internal/db"
 	"github.com/youssefM1999/social/internal/env"
 	"github.com/youssefM1999/social/internal/mailer"
 	"github.com/youssefM1999/social/internal/store"
+	"github.com/youssefM1999/social/internal/store/cache"
 	"go.uber.org/zap"
 )
 
@@ -60,6 +62,12 @@ func main() {
 				exp:    env.GetDuration("TOKEN_AUTH_EXP", time.Hour*24*3),
 			},
 		},
+		redisCfg: redisConfig{
+			addr:    env.GetString("REDIS_ADDR", "localhost:6379"),
+			pwd:     env.GetString("REDIS_PWD", ""),
+			db:      env.GetInt("REDIS_DB", 0),
+			enabled: env.GetBool("REDIS_ENABLED", false),
+		},
 	}
 
 	// Logger
@@ -81,6 +89,18 @@ func main() {
 
 	store := store.NewStorage(db)
 
+	// Cache instance
+	var rdb *redis.Client
+	if cfg.redisCfg.enabled {
+		rdb = cache.NewRedisClient(
+			cfg.redisCfg.addr,
+			cfg.redisCfg.pwd,
+			cfg.redisCfg.db,
+		)
+		logger.Info("redis connection pool established")
+	}
+	cacheStorage := cache.NewRedisStorage(rdb)
+
 	mailer := mailer.NewSendgrid(cfg.mail.sendGrid.apiKey, cfg.mail.fromEmail)
 
 	tokenHost := "gophersocial"
@@ -92,6 +112,7 @@ func main() {
 		logger:        logger,
 		mailer:        mailer,
 		authenticator: jwtAuthenticator,
+		cacheStorage:  cacheStorage,
 	}
 	mux := app.mount()
 	logger.Fatal(app.run(mux))

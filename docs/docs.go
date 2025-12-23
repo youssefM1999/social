@@ -443,6 +443,11 @@ const docTemplate = `{
         },
         "/users/{userID}": {
             "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "description": "get user",
                 "consumes": [
                     "application/json"

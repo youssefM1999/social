@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"expvar"
 	"fmt"
 	"net/http"
 	"os"
@@ -18,7 +19,9 @@ import (
 
 	"github.com/youssefM1999/social/docs" // this is required to generate swagger docs
 	"github.com/youssefM1999/social/internal/auth"
+	"github.com/youssefM1999/social/internal/env"
 	"github.com/youssefM1999/social/internal/mailer"
+	"github.com/youssefM1999/social/internal/ratelimiter"
 	"github.com/youssefM1999/social/internal/store"
 	"github.com/youssefM1999/social/internal/store/cache"
 )
@@ -26,10 +29,11 @@ import (
 type application struct {
 	config        config
 	store         store.Storage
+	cacheStorage  cache.Storage
 	logger        *zap.SugaredLogger
 	mailer        mailer.Client
 	authenticator auth.Authenticator
-	cacheStorage  cache.Storage
+	rateLimiter   ratelimiter.Limiter
 }
 
 type config struct {
@@ -41,6 +45,7 @@ type config struct {
 	frontendURL string
 	auth        authConfig
 	redisCfg    redisConfig
+	rateLimiter ratelimiter.Config
 }
 
 type dbConfig struct {
@@ -95,11 +100,25 @@ func (app *application) mount() http.Handler {
 	}))
 
 	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.URLFormat)
+	// Placed before the rate limiter middleware to allow CORS requests to the rate limiter endpoint
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{env.GetString("CORS_ALLOWED_ORIGINS", "FRONTEND_URL")},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	}))
+	r.Use(app.RateLimiterMiddleware)
+
 	r.Route("/v1", func(r chi.Router) {
-		r.With(app.BasicAuthMiddleware()).Get("/health", app.healthCheckHandler)
+		// operations
+		r.Get("/health", app.healthCheckHandler)
+		r.With(app.BasicAuthMiddleware()).Get("/debug/metrics", expvar.Handler().ServeHTTP)
 
 		docsURL := fmt.Sprintf("%s/swagger/doc.json", app.config.addr)
 		r.Get("/swagger/*", httpSwagger.Handler(httpSwagger.URL(docsURL)))

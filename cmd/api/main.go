@@ -1,6 +1,8 @@
 package main
 
 import (
+	"expvar"
+	"runtime"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -8,6 +10,7 @@ import (
 	"github.com/youssefM1999/social/internal/db"
 	"github.com/youssefM1999/social/internal/env"
 	"github.com/youssefM1999/social/internal/mailer"
+	"github.com/youssefM1999/social/internal/ratelimiter"
 	"github.com/youssefM1999/social/internal/store"
 	"github.com/youssefM1999/social/internal/store/cache"
 	"go.uber.org/zap"
@@ -68,6 +71,11 @@ func main() {
 			db:      env.GetInt("REDIS_DB", 0),
 			enabled: env.GetBool("REDIS_ENABLED", false),
 		},
+		rateLimiter: ratelimiter.Config{
+			RequestsPerTimeFrame: env.GetInt("RATE_LIMITER_REQUESTS_PER_TIME_FRAME", 20),
+			TimeFrame:            env.GetDuration("RATE_LIMITER_TIME_FRAME", time.Second*5),
+			Enabled:              env.GetBool("RATE_LIMITER_ENABLED", true),
+		},
 	}
 
 	// Logger
@@ -101,6 +109,9 @@ func main() {
 	}
 	cacheStorage := cache.NewRedisStorage(rdb)
 
+	// Rate Limiter instance
+	rateLimiter := ratelimiter.NewFixedWindowLimiter(cfg.rateLimiter.RequestsPerTimeFrame, cfg.rateLimiter.TimeFrame)
+
 	mailer := mailer.NewSendgrid(cfg.mail.sendGrid.apiKey, cfg.mail.fromEmail)
 
 	tokenHost := "gophersocial"
@@ -113,7 +124,18 @@ func main() {
 		mailer:        mailer,
 		authenticator: jwtAuthenticator,
 		cacheStorage:  cacheStorage,
+		rateLimiter:   rateLimiter,
 	}
+
+	// metrics collected
+	expvar.NewString("version").Set(version)
+	expvar.Publish("database", expvar.Func(func() any {
+		return db.Stats()
+	}))
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
+
 	mux := app.mount()
 	logger.Fatal(app.run(mux))
 }

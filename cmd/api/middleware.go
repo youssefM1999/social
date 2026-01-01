@@ -63,7 +63,7 @@ func (app *application) BasicAuthMiddleware() func(http.Handler) http.Handler {
 			// read the auth header
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				app.unauthorizedErrorResponse(w, r, errors.New("authorization header is required"))
+				app.unauthorizedBasicErrorResponse(w, r, errors.New("authorization header is required"))
 				return
 			}
 
@@ -158,4 +158,17 @@ func (a *application) getUser(ctx context.Context, userId int64) (*store.User, e
 	}
 
 	return user, nil
+}
+
+func (app *application) RateLimiterMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if app.config.rateLimiter.Enabled {
+			if allow, retryAfter := app.rateLimiter.Allow(r.RemoteAddr); !allow {
+				app.rateLimitExceededResponse(w, r, retryAfter.String())
+				return
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0](https://github.com/youssefM1999/social/compare/v1.0.0...v1.1.0) (2026-01-02)
+
+
+### Features
+
+* add automation workflow ([026f8bc](https://github.com/youssefM1999/social/commit/026f8bcaaaf717a97f848dd280344a9f6df5d475))
+* my release please script ([8614a9f](https://github.com/youssefM1999/social/commit/8614a9f272434030f52ba160187fae07e46fdcf5))
+
+
+### Bug Fixes
+
+* the deployment yaml file ([76e86b5](https://github.com/youssefM1999/social/commit/76e86b5fabaac7c949a58dd804f3e629e3100fc9))
+
 ## [1.0.0] - 2025-12-23
 
 ### Features

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0](https://github.com/youssefM1999/social/compare/v1.1.0...v1.2.0) (2026-01-02)
+
+
+### Features
+
+* update api version automatically ([0196178](https://github.com/youssefM1999/social/commit/019617894870949a5f7ec4357832eb584ff73df8))
+
 ## [1.1.0](https://github.com/youssefM1999/social/compare/v1.0.0...v1.1.0) (2026-01-02)
 
 

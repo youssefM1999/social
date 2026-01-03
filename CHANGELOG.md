@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0](https://github.com/youssefM1999/social/compare/v1.2.0...v1.3.0) (2026-01-03)
+
+
+### Features
+
+* create dockerfile ([7590aa7](https://github.com/youssefM1999/social/commit/7590aa72aadd9e95324634b02d6c17c89edf586b))
+
 ## [1.2.0](https://github.com/youssefM1999/social/compare/v1.1.0...v1.2.0) (2026-01-02)
 
 
